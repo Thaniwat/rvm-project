@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RVM Smart Scanner</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- TensorFlow.js and COCO-SSD -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Link to CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="flex flex-col min-h-screen text-gray-800">
+
+    <!-- Header & Score Board -->
+    <header class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-6 shadow-md rounded-b-3xl z-10 relative">
+        <h1 class="text-center text-xl font-bold mb-4 tracking-wide">Eco-Scan RVM</h1>
+        <div class="bg-white/20 backdrop-blur-md rounded-2xl p-4 text-center border border-white/30 shadow-inner">
+            <p class="text-emerald-50 text-sm mb-1">คะแนนสะสมรวม</p>
+            <div class="text-5xl font-bold" id="totalPointsDisplay">0</div>
+            <p class="text-emerald-100 text-xs mt-1">แต้ม</p>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col p-4 w-full max-w-md mx-auto -mt-2 z-0 relative">
+        
+        <!-- Status Banner -->
+        <div id="statusBanner" class="bg-blue-100 text-blue-700 text-sm font-medium py-2 px-4 rounded-full text-center mb-4 flex items-center justify-center shadow-sm">
+            <span class="loader w-4 h-4 border-2 mr-2"></span>
+            กำลังโหลดระบบ AI...
+        </div>
+
+        <!-- Mode Tabs (สลับตำแหน่งแล้ว) -->
+        <div class="flex border-b border-gray-200 mb-4" id="tabsContainer" style="pointer-events: none; opacity: 0.5;">
+            <button id="tabUpload" class="flex-1 py-3 text-center tab-active transition">📁 อัปโหลดรูป</button>
+            <button id="tabCamera" class="flex-1 py-3 text-center tab-inactive transition">📷 โหมดกล้อง</button>
+        </div>
+
+        <!-- View 1: Upload (แสดงเป็นค่าเริ่มต้น) -->
+        <div id="viewUpload" class="flex flex-col gap-4">
+            <label for="imageUpload" class="flex flex-col items-center justify-center w-full h-64 border-2 border-emerald-300 border-dashed rounded-xl cursor-pointer bg-emerald-50 hover:bg-emerald-100 transition shadow-inner">
+                <div class="flex flex-col items-center justify-center pt-5 pb-6 text-emerald-600">
+                    <svg class="w-12 h-12 mb-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    <p class="mb-2 text-lg font-semibold">แตะเพื่อเลือกรูปภาพ</p>
+                    <p class="text-sm text-emerald-500/70">รองรับ JPG, PNG</p>
+                </div>
+                <input id="imageUpload" type="file" accept="image/*" class="hidden" />
+            </label>
+        </div>
+
+        <!-- View 2: Camera (ซ่อนไว้ก่อน) -->
+        <div id="viewCamera" class="hidden flex-col gap-4">
+            <div class="relative w-full rounded-lg overflow-hidden bg-black shadow-md">
+                <video id="webcam" autoplay playsinline muted></video>
+                <div id="cameraOverlay" class="absolute inset-0 flex items-center justify-center text-white/50 border-2 border-dashed border-white/30 pointer-events-none m-4 rounded">
+                    <span class="bg-black/50 px-3 py-1 rounded-full text-xs">วางขวดให้อยู่ในกรอบ</span>
+                </div>
+            </div>
+            <button id="btnCapture" class="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-lg">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                ถ่ายภาพเพื่อประมวลผล
+            </button>
+        </div>
+
+        <!-- View 3: Result (Canvas) -->
+        <div id="viewResult" class="hidden flex-col gap-4">
+            <div class="bg-white p-2 rounded-xl shadow-md border border-gray-100 relative">
+                <canvas id="resultCanvas"></canvas>
+                
+                <div id="processingOverlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl z-10 hidden">
+                    <div class="loader mb-3"></div>
+                    <p class="text-emerald-700 font-semibold animate-pulse">AI กำลังวิเคราะห์...</p>
+                </div>
+            </div>
+            
+            <div id="resultText" class="text-center font-bold text-lg text-gray-700 min-h-[28px]"></div>
+
+            <button id="btnReset" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 mt-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                ทำรายการใหม่
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Link to JS -->
+    <script src="script.js"></script>
+</body>
+</html>
