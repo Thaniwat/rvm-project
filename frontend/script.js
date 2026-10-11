@@ -154,7 +154,7 @@ async function detectAndScore() {
     let currentImagePoints = 0;
 
     predictions.forEach(prediction => {
-        if (prediction.class === 'bottle' && prediction.score > 0.4) {
+        if (prediction.class === 'bottle' && prediction.score > 0.25) {
             foundBottle = true;
             
             const [x, y, width, height] = prediction.bbox;
@@ -228,3 +228,29 @@ function animateValue(obj, start, end, duration) {
     };
     window.requestAnimationFrame(step);
 }
+
+imageUpload.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+            // สร้าง ImageBitmap หรือรองรับการหมุนตาม EXIF อัตโนมัติ
+            createImageBitmap(file, { imageOrientation: 'from-image' }).then((bitmap) => {
+                let scale = 1;
+                if (bitmap.width > MAX_PROCESSING_WIDTH) {
+                    scale = MAX_PROCESSING_WIDTH / bitmap.width;
+                }
+                canvas.width = bitmap.width * scale;
+                canvas.height = bitmap.height * scale;
+                
+                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                showResultViewAndProcess();
+            });
+        }
+        img.src = event.target.result;
+    }
+    reader.readAsDataURL(file);
+});
